@@ -1,0 +1,20 @@
+{
+    "name": "Kit2.Attribute.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:ddf7969d767c5974eb97814c936fd40b",
+        "GUID:478a2357cc57436488a56e564b08d223",
+        "GUID:f06555f75b070af458a003d92f9efb00"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

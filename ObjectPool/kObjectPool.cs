@@ -39,11 +39,17 @@ namespace Kit2.ObjectPool
 			PreloadOnDemend();
 			if (ShouldAutoRegisterPool())
 			{
-				var type = GetType();
-				bool isSubClass = type.IsSubclassOf(typeof(kObjectPool));
-				if (isSubClass)
-					Instances.Add(this);
+				Instances.Add(this);
 			}
+		}
+		public bool IsDestroy { get; private set; } = false;
+		protected virtual void OnDestroy()
+		{
+			if (IsDestroy)
+				return;
+			Instances.Remove(this);
+			Dispose();
+			IsDestroy = true; // last step, so we can reparent all child
 		}
 
 		private List<MyTaskBase> m_Tasks = null;
@@ -59,52 +65,6 @@ namespace Kit2.ObjectPool
 		protected virtual void Update()
 		{
 			MyTaskHandler.ManualParallelUpdate(tasks);
-		}
-
-		public bool IsDestroy { get; private set; } = false;
-		protected virtual void OnDestroy()
-		{
-			if (IsDestroy)
-				return;
-			if (ShouldAutoRegisterPool())
-			{
-				var type = GetType();
-				// bool isSubClass = type.IsSubclassOf(typeof(kObjectPool));
-			}
-			//AxSceneManager.Event_SceneBeforeUnload -= AxSceneManagerV2_Event_SceneBeforeUnload;
-
-			Dispose();
-			IsDestroy = true; // last step, so we can reparent all child
-		}
-
-		private void ReleaseTokensControl(System.Action callback = null)
-		{
-			try
-			{
-				if (category != null)
-				{
-					foreach (var c in category.Values)
-					{
-						try
-						{
-							c.Dispose();
-						}
-						catch (System.Exception ex)
-						{
-							ex.DeepLogInvocationException($"{nameof(kObjectPool)}-{name} : {nameof(ReleaseTokensControl)}");
-						}
-					}
-					category.Clear();
-				}
-			}
-			catch (System.Exception ex)
-			{
-
-			}
-			finally
-			{
-				callback?.TryCatchDispatchEventError(o => o?.Invoke());
-			}
 		}
 
 		protected static bool IsAppQuit { get; private set; } = false;
@@ -150,7 +110,7 @@ namespace Kit2.ObjectPool
 			tasks.Add(new PreloadTask(cat, preloadInfo, transform));
 		}
 
-		private class PreloadTask : Kit2.Task.MyTaskWithState
+		private class PreloadTask : MyTaskWithState
 		{
 			private readonly Transform parent;
 			private readonly PreloadInfo preloadInfo;
@@ -461,7 +421,7 @@ namespace Kit2.ObjectPool
 				return false;
 			}
 
-			var arr = token.GetComponentsInChildren<ISpawnToken>();
+			var arr = token.GetComponentsInChildCache<ISpawnToken>(m_TokenDict, true);
 			foreach (var o in arr)
 			{
 				o.OnDespawn();
@@ -471,8 +431,6 @@ namespace Kit2.ObjectPool
 			if (!IsDestroy)
 			{
 				m_ActiveTokens.Remove(token);
-				if (!token.transform.IsChildOf(transform))
-					token.transform.SetParent(transform, true);
 				category[prefab].ReturnToken(token);
 			}
 			return true;
@@ -487,7 +445,7 @@ namespace Kit2.ObjectPool
 			}
 			return go;
 		}
-#endregion Pooling
+		#endregion Pooling
 
 		#region Public API
 		public GameObject Spawn(GameObject prefab, Transform parent, bool worldStay = false)

@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEditor;
 using Unity.EditorCoroutines.Editor;
 
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	/// <summary>
 	/// task can be execute without GameObject and Editor

@@ -1,5 +1,5 @@
 using UnityEngine;
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	public class MyTaskAction : MyTask
 	{

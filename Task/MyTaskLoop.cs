@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	/// <summary>
 	/// A task loop through all sub tasks.

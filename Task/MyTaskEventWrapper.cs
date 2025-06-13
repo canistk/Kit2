@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	/// <summary>
 	/// A simple wrapper to wrap event base callback into task method.

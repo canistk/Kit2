@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 #endif
 using UnityEngine.ResourceManagement.AsyncOperations;
-using Kit2.Task;
+using Kit2.Tasks;
 
 namespace Kit2.ObjectPool
 {

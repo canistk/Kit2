@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	/// <summary>
 	/// task with common <see cref="OnEnter"/>, <see cref="OnComplete"/> state

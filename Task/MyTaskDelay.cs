@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace Kit2.Task
+namespace Kit2.Tasks
 {
 	public class MyTaskDelay : MyTask
 	{

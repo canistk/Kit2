@@ -76,11 +76,11 @@ namespace Kit2.Task
         public static int TaskCount => s_Tasks?.Count ?? 0;
         private static int m_ExecuteIndex;
         public static int Executing => TaskCount > 0 ? m_ExecuteIndex : -1;
-        private static void RuntimeUpdate() => ManualTasksUpdate(s_Tasks);
+        private static void RuntimeUpdate() => ManualParallelUpdate(s_Tasks);
 
         /// <summary>Allow implement task update on custom timing.</summary>
         /// <param name="_tasks"></param>
-        public static void ManualTasksUpdate(List<MyTaskBase> _tasks)
+        public static void ManualParallelUpdate(List<MyTaskBase> _tasks)
         {
 			if (_tasks == null || _tasks.Count == 0)
 				return;
@@ -125,6 +125,6 @@ namespace Kit2.Task
 			}
             markDel.Clear();
 		}
-        #endregion Runtime
-    }
+		#endregion Runtime
+	}
 }

@@ -783,6 +783,16 @@ namespace Kit2
 #endif
 		}
 
+		public static void EnsureFolderExist(string path)
+		{
+			ResolvePath(path, out var abs, out var relative);
+			var dirPath = Path.GetDirectoryName(abs);
+			if (Directory.Exists(dirPath))
+				return;
+			Directory.CreateDirectory(dirPath);
+			AssetDatabase.Refresh();
+		}
+
 		public static void CreateOrWriteFile(string path, string content, System.Text.Encoding encoding = default)
 		{
 			if (path == null || path.Length == 0)

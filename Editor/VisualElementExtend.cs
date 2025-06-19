@@ -1,5 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
 namespace Kit2
@@ -73,6 +75,56 @@ namespace Kit2
 			horizon.Add(left);
 			horizon.Add(right);
 			return horizon;
+		}
+
+		public static ObjectField CachePrefabField<OBJ>(string fieldName, string saveKey)
+			where OBJ : UnityEngine.Object
+		{
+			var field = new ObjectField(fieldName)
+			{
+				objectType = typeof(OBJ),
+				allowSceneObjects = false,
+
+			};
+			field.RegisterValueChangedCallback(_OnValueChanged);
+			var path = EditorPrefs.GetString(saveKey, string.Empty);
+			if (!string.IsNullOrEmpty(path))
+			{
+				var prefab = AssetDatabase.LoadAssetAtPath<OBJ>(path);
+				if (prefab != null)
+				{
+					field.value = prefab;
+				}
+			}
+			return field;
+
+			void _OnValueChanged<T>(ChangeEvent<T> evt)
+				where T : UnityEngine.Object
+			{
+				if (evt.newValue == null)
+				{
+					EditorPrefs.DeleteKey(saveKey);
+				}
+				else
+				{
+					var go = evt.newValue as T;
+					//var inScene = go.scene.IsValid();
+					//if (inScene)
+					//{
+					//	Debug.LogWarning("Prefab field should not be a scene object.", go);
+					//	field.value = null;
+					//	return;
+					//}
+					//if (!AssetDatabase.IsMainAsset(go))
+					if (!EditorUtility.IsPersistent(go))
+					{
+						Debug.LogWarning("Prefab field should be a main asset.", go);
+						field.value = null;
+						return;
+					}
+					EditorPrefs.SetString(saveKey, AssetDatabase.GetAssetPath(evt.newValue));
+				}
+			}
 		}
 	}
 }

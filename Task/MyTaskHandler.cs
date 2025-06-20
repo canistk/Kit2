@@ -125,6 +125,39 @@ namespace Kit2.Tasks
 			}
             markDel.Clear();
 		}
+
+        public static async void AsyncWrap(MyTaskBase task)
+        {
+            if (task == null)
+                throw new ArgumentNullException(nameof(task), "Task cannot be null.");
+            try
+            {
+                do
+                {
+                    await System.Threading.Tasks.Task.Delay(1).ConfigureAwait(true);
+                }
+                while (task.Execute());
+            }
+            catch (Exception ex)
+            {
+                Debug.LogException(ex);
+            }
+            finally
+            {
+                if (task is IDisposable disposableTask)
+                {
+                    try
+                    {
+                        disposableTask.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogException(ex);
+                    }
+                }
+                task = null;
+            }
+		}
 		#endregion Runtime
 	}
 }

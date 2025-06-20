@@ -6,6 +6,7 @@ using System.Linq;
 namespace Kit2.Pooling
 {
 	using Task = System.Threading.Tasks.Task;
+	[System.Obsolete("Use kObjectPool instead.", true)]
 	public class ObjectPool : MonoBehaviour, System.IDisposable
 	{
 		[SerializeField] PrefabPreloadSetting[] m_PrefabPreloadSettings = { };
@@ -452,6 +453,7 @@ namespace Kit2.Pooling
 
 
 	/// <summary>An interface to allow spawned object to receive the following callback during Spawn/Despawn flow.</summary>
+	[System.Obsolete("Use ISpawnToken instead.", true)]
 	public interface ISpawnObject
 	{
 		/// <summary>Will boardcast to token(s) after spawn flow.</summary>

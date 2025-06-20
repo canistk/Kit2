@@ -79,8 +79,13 @@ namespace Kit2.ObjectPool
 		[System.Serializable]
 		public struct PreloadInfo
 		{
+			[Tooltip("Prefab")]
 			public GameObject prefab;
+			[Tooltip("Delay before start preload, useful for scene load, so that the scene can be loaded first.")]
+			public float delayPreload;
+			[Tooltip("The interval between each preload elements, distribute the performance overhead during GameObject.Instantiate")]
 			public float interval;
+			[Tooltip("Auto preload prefab(s) base on giving amount")]
 			public int count;
 		}
 
@@ -107,7 +112,12 @@ namespace Kit2.ObjectPool
 		public void Preload(PreloadInfo preloadInfo)
 		{
 			var cat = GetOrAddCategory(preloadInfo.prefab, false);
-			tasks.Add(new PreloadTask(cat, preloadInfo, transform));
+			var task = new PreloadTask(cat, preloadInfo, transform);
+#if false
+			tasks.Add(task);
+#else
+			MyTaskHandler.AsyncWrap(task);
+#endif
 		}
 
 		private class PreloadTask : MyTaskWithState
@@ -116,12 +126,13 @@ namespace Kit2.ObjectPool
 			private readonly PreloadInfo preloadInfo;
 			private readonly PrefabCategory spawner;
 			private float m_Last;
+			private KeyValuePair<bool, float> m_FirstStart;
 			public PreloadTask(PrefabCategory prefabInfo, PreloadInfo preloadInfo, Transform parent)
 			{
 				this.spawner = prefabInfo;
 				this.preloadInfo = preloadInfo;
 				this.parent = parent;
-				m_Last = Time.realtimeSinceStartup;
+				this.m_FirstStart = default;
 			}
 
 			protected override void OnEnter() { }
@@ -136,6 +147,9 @@ namespace Kit2.ObjectPool
 					return false; // early end for enough token spawn.
 				}
 
+				if (WaitForDelay())
+					return true;
+				
 				var diff = Time.realtimeSinceStartup - m_Last;
 				if (diff < preloadInfo.interval)
 					return true; // wait for interval.
@@ -145,6 +159,22 @@ namespace Kit2.ObjectPool
 				return spawner.total < preloadInfo.count;
 			}
 			protected override void OnComplete() { }
+
+			bool WaitForDelay()
+			{
+				if (!m_FirstStart.Key)
+				{
+					// first time, reference start time.
+					m_FirstStart = new KeyValuePair<bool, float>(true, Time.realtimeSinceStartup);
+					m_Last = Time.realtimeSinceStartup;
+				}
+
+				if (Time.realtimeSinceStartup - m_FirstStart.Value <= preloadInfo.delayPreload)
+				{
+					return true; // wait for delay.
+				}
+				return false;
+			}
 		}
 
 		#endregion Preload
@@ -171,13 +201,14 @@ namespace Kit2.ObjectPool
 
 				if (stringOrPrefab == null)
 				{
-					throw new System.ArgumentNullException(nameof(stringOrPrefab), "Prefab cannot be null");
+					Debug.LogError("Prefab cannot be null");
+					// throw new System.ArgumentNullException(nameof(stringOrPrefab), "Prefab cannot be null");
 				}
 				else if (stringOrPrefab is GameObject _prefab)
 				{
 					this.prefab = _prefab;
 				}
-				if (stringOrPrefab is string path)
+				else if (stringOrPrefab is string path)
 				{
 #if USE_ADDRESSABLE
 					if (_isAddressable)
@@ -444,6 +475,21 @@ namespace Kit2.ObjectPool
 				go.transform.localRotation = Quaternion.identity;
 			}
 			return go;
+		}
+
+		public void DespawnAll()
+		{
+			// category.Values.Select(cat => cat.activeObjs).Select(o => o.ToArray()).SelectMany(o => o).ToArray();
+			foreach (var cat in category.Values)
+			{
+				var arr = cat.activeObjs.ToArray();
+				foreach (var a in arr)
+				{
+					if (a == null)
+						continue;
+					InternalDespawn(a);
+				}
+			}
 		}
 		#endregion Pooling
 

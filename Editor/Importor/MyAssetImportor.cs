@@ -50,8 +50,8 @@ namespace Kit2
 			if (assetImporter is not ModelImporter modelImporter)
 				return;
 
-			//if (!AskForDeveloperPermission(setting.FBXDirectory))
-			//	return;
+			if (!AskForDeveloperPermission(setting.FBXDirectory))
+				return;
 
 			var animations = modelImporter.defaultClipAnimations;
 			if (animations == null || animations.Length == 0)

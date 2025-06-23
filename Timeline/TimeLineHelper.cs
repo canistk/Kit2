@@ -152,5 +152,10 @@ namespace Kit2
 				return;
 			playableDirector.Evaluate();
 		}
+
+		public bool IsPlayedOnce()
+		{
+			return m_PlayInfo.isPlayedOnce;
+		}
 	}
 }

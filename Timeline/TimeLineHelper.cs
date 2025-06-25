@@ -40,12 +40,12 @@ namespace Kit2
 		private PlayInfo m_PlayInfo = default;
 		public event System.Action EVENT_PlayedOneCycle;
 
-		private void Reset()
+		protected virtual void Reset()
 		{
 			ReferenceEquals(playableDirector, null);
 		}
 
-		private void Awake()
+		protected virtual void Awake()
 		{
 			playableDirector.played += OnPlay;
 			playableDirector.paused += OnPaused;
@@ -56,14 +56,14 @@ namespace Kit2
 				OnPlay(playableDirector);
 			}
 		}
-		private void OnDestroy()
+		protected virtual void OnDestroy()
 		{
 			playableDirector.played -= OnPlay;
 			playableDirector.paused -= OnPaused;
 			playableDirector.stopped -= OnStopped;
 		}
 
-		private void Update()
+		protected virtual void Update()
 		{
 			DefinePlayOnceCycle();
 		}
@@ -81,7 +81,7 @@ namespace Kit2
 		{
 			m_PlayInfo = default;
 		}
-
+		public bool IsPlayedOnce() => m_PlayInfo.isPlayedOnce;
 		private void DefinePlayOnceCycle()
 		{
 			var p = playableDirector;
@@ -153,9 +153,5 @@ namespace Kit2
 			playableDirector.Evaluate();
 		}
 
-		public bool IsPlayedOnce()
-		{
-			return m_PlayInfo.isPlayedOnce;
-		}
 	}
 }

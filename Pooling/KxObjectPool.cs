@@ -7,6 +7,7 @@ using UnityEngine.AddressableAssets;
 #endif
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Kit2.Tasks;
+using System;
 
 namespace Kit2.ObjectPool
 {
@@ -22,7 +23,16 @@ namespace Kit2.ObjectPool
 
 		public bool Despawn(GameObject go);
 	}
-	public class kObjectPool : MonoBehaviour, System.IDisposable, ISpawner
+
+	public enum eSrcType
+	{
+		GameObject = 0, // for runtime spawn
+		Resources = 1,
+		Addressable = 2,
+		// StreamingAssets, TODO: implement custom loading from StreamingAssets.
+	}
+
+	public class KxObjectPool : MonoBehaviour, System.IDisposable, ISpawner
 	{
 		#region Event
 		public delegate void TokenEvent(GameObject token);
@@ -30,7 +40,7 @@ namespace Kit2.ObjectPool
 		public event TokenEvent Event_Despawn;
 		#endregion Event
 
-		public static List<kObjectPool> Instances { get; } = new List<kObjectPool>(10);
+		public static List<KxObjectPool> Instances { get; } = new List<KxObjectPool>(10);
 
 		#region System
 		protected virtual bool ShouldAutoRegisterPool() => false;
@@ -95,7 +105,7 @@ namespace Kit2.ObjectPool
 		{
 			if (m_Category != null)
 				return;
-			m_Category = new Dictionary<GameObject, PrefabCategory>(10);
+			m_Category = new Dictionary<CombineKey, PrefabCategory>(10);
 			if (m_PreloadConfig == null)
 				m_PreloadConfig = new PreloadInfo[0];
 			for (int i = 0; i < m_PreloadConfig.Length; ++i)
@@ -111,7 +121,7 @@ namespace Kit2.ObjectPool
 
 		public void Preload(PreloadInfo preloadInfo)
 		{
-			var cat = GetOrAddCategory(preloadInfo.prefab, false);
+			var cat = GetOrAddCategory(preloadInfo.prefab, eSrcType.GameObject);
 			var task = new PreloadTask(cat, preloadInfo, transform);
 #if false
 			tasks.Add(task);
@@ -180,9 +190,38 @@ namespace Kit2.ObjectPool
 		#endregion Preload
 
 		#region Pooling
+		private struct CombineKey: IEquatable<CombineKey>
+		{
+			public readonly eSrcType srcType;
+			public readonly object stringOrObject;
+			public readonly int hashCode;
+			public CombineKey(eSrcType srcType, object stringOrObject)
+			{
+				this.srcType = srcType;
+				this.stringOrObject = stringOrObject ?? throw new System.ArgumentNullException(nameof(stringOrObject), "stringOrObject cannot be null");
+				this.hashCode = System.HashCode.Combine(srcType, stringOrObject.GetHashCode());
+			}
+			public override int GetHashCode() => hashCode;
+
+			public override bool Equals(object obj)
+			{
+				return obj is CombineKey other && Equals(other);
+			}
+			public bool Equals(CombineKey other)
+			{
+				if (srcType != other.srcType)
+					return false;
+				var x = stringOrObject;
+				var y = other.stringOrObject;
+				if (x == null && y == null)
+					return true;
+				return x.Equals(y);
+			}
+		}
 		private class PrefabCategory : System.IDisposable
 		{
-			public readonly bool isAddressable;
+			public readonly CombineKey key;
+			public eSrcType srcType => key.srcType;
 			public readonly GameObject prefab;
 			public AsyncOperationHandle<GameObject> handle;
 			public readonly Transform parent;
@@ -190,42 +229,17 @@ namespace Kit2.ObjectPool
 			public Queue<GameObject> deactiveObjs;
 			private bool isDisposed;
 
-			public PrefabCategory(bool _isAddressable, object stringOrPrefab, Transform _parent)
+			public PrefabCategory(CombineKey key, GameObject prefab, Transform _parent)
 			{
 				this.parent = _parent;
 				this.activeObjs = new HashSet<GameObject>(10);
 				this.deactiveObjs = new Queue<GameObject>(10);
-				this.isAddressable = _isAddressable;
+				this.key = key;
 				this.handle = default;
-				this.prefab = null;
+				this.prefab = prefab;
 
-				if (stringOrPrefab == null)
-				{
-					Debug.LogError("Prefab cannot be null");
-					// throw new System.ArgumentNullException(nameof(stringOrPrefab), "Prefab cannot be null");
-				}
-				else if (stringOrPrefab is GameObject _prefab)
-				{
-					this.prefab = _prefab;
-				}
-				else if (stringOrPrefab is string path)
-				{
-#if USE_ADDRESSABLE
-					if (_isAddressable)
-					{
-						this.handle = Addressables.LoadAssetAsync<GameObject>(path);
-						this.prefab = this.handle.WaitForCompletion();
-					}
-					else
-#endif
-					{
-						this.prefab = Resources.Load<GameObject>(path);
-					}
-				}
-				else
-				{
-					throw new System.NotImplementedException($"Invalid Spawn cases. {stringOrPrefab}");
-				}
+				if (prefab == null)
+					throw new System.ArgumentNullException(nameof(prefab), "Prefab cannot be null");
 			}
 
 			public int total => activeObjs.Count + deactiveObjs.Count;
@@ -322,7 +336,7 @@ namespace Kit2.ObjectPool
 					}
 					deactiveObjs.Clear();
 
-					if (isAddressable)
+					if (srcType == eSrcType.Addressable)
 					{
 #if USE_ADDRESSABLE
 						Addressables.Release(handle);
@@ -352,9 +366,9 @@ namespace Kit2.ObjectPool
 			}
 		}
 
-		private Dictionary<GameObject /*token*/, GameObject /*prefab*/> m_ActiveTokens = new Dictionary<GameObject, GameObject>(100);
-		private Dictionary<GameObject /*prefab*/, PrefabCategory> m_Category = null;
-		private Dictionary<GameObject /*prefab*/, PrefabCategory> category
+		private Dictionary<GameObject /*token*/, CombineKey> m_ActiveTokens = new Dictionary<GameObject, CombineKey>(100);
+		private Dictionary<CombineKey, PrefabCategory> m_Category = null;
+		private Dictionary<CombineKey, PrefabCategory> category
 		{
 			get
 			{
@@ -366,10 +380,42 @@ namespace Kit2.ObjectPool
 			}
 		}
 
-		public IEnumerable<GameObject> prefabs => category.Keys;
+		public IEnumerable<GameObject> prefabs
+		{
+			get
+			{
+				foreach (var val in category.Values)
+				{
+					yield return val.prefab;
+				}
+			}
+		}
 		protected IEnumerable<GameObject> spawned => m_ActiveTokens.Keys;
 
-		private PrefabCategory GetOrAddCategory(object prefabOrString, bool isAddressable)
+		public bool TryGetPrefab(object prefabOrString, eSrcType srcType, out GameObject prefab)
+		{
+			prefab = null;
+			if (prefabOrString == null)
+			{
+				Debug.LogError("invalid prefab to spawn.", this);
+				return false;
+			}
+			if (prefabOrString is GameObject go)
+			{
+				if (srcType != eSrcType.GameObject)
+				{
+					Debug.LogWarning($"[{nameof(KxObjectPool)}] GameObject type should only be used with eSrcType.GameObject, but got {srcType}.", this);
+				}
+				srcType = eSrcType.GameObject; // force to GameObject type
+			}
+			var key = new CombineKey(srcType, prefabOrString);
+			if (!m_Category.TryGetValue(key, out var category))
+				return false;
+			prefab = category.prefab;
+			return prefab != null;
+		}
+
+		private PrefabCategory GetOrAddCategory(object prefabOrString, eSrcType srcType)
 		{
 			if (prefabOrString == null)
 			{
@@ -377,54 +423,114 @@ namespace Kit2.ObjectPool
 				return null;
 			}
 
-			GameObject prefab = null;
-			if (prefabOrString is string path)
+			if (prefabOrString is GameObject go)
 			{
-#if USE_ADDRESSABLE
-				if (isAddressable)
+				if (srcType != eSrcType.GameObject)
 				{
-					var oper = Addressables.LoadAssetAsync<GameObject>(path);
-					prefab = oper.WaitForCompletion();
+					Debug.LogWarning($"[{nameof(KxObjectPool)}] GameObject type should only be used with eSrcType.GameObject, but got {srcType}.", this);
 				}
-				else
-#endif
-				{
-					prefab = Resources.Load<GameObject>(path);
-				}
-			}
-			else if (prefabOrString is GameObject _prefab)
-			{
-				prefab = _prefab;
-			}
-			else
-			{
-				throw new System.NotImplementedException($"Invalid Spawn cases. {prefabOrString}");
+				srcType = eSrcType.GameObject; // force to GameObject type
 			}
 
-			if (!category.TryGetValue(prefab, out PrefabCategory info))
+			var key = new CombineKey(srcType, prefabOrString);
+
+
+			// Quick check if prefab already exists in category
+			if (!category.TryGetValue(key, out PrefabCategory info))
 			{
-				category.Add(prefab, info = new PrefabCategory(isAddressable, prefab, transform));
+				// TODO: locate prefab based on srcType
+				GameObject prefab = null;
+				switch (srcType)
+				{
+					case eSrcType.GameObject:
+					{
+						prefab = prefabOrString as GameObject;
+						if (prefab == null)
+						{
+							Debug.LogError($"[{nameof(KxObjectPool)}] GameObject type requires a valid GameObject, but got {prefabOrString}.", this);
+							return null;
+						}
+					}
+					break;
+					case eSrcType.Resources:
+					{
+						var path = prefabOrString as string;
+						if (string.IsNullOrEmpty(path))
+						{
+							Debug.LogError($"[{nameof(KxObjectPool)}] Addressable path cannot be null or empty.", this);
+							return null;
+						}
+						prefab = Resources.Load<GameObject>(path);
+					}
+					break;
+					//case eSrcType.StreamingAssets:
+					//{
+					//	var path = prefabOrString as string;
+					//	if (string.IsNullOrEmpty(path))
+					//	{
+					//		Debug.LogError($"[{nameof(KxObjectPool)}] Addressable path cannot be null or empty.", this);
+					//		return null;
+					//	}
+					//	// TODO: try load file from StreamingAssets
+					//	if (path.StartsWith(Application.streamingAssetsPath))
+					//	{
+					//		KxFile.Read()
+					//	}
+					//	else if (path.StartsWith(Application.persistentDataPath))
+					//	{
+					//	}
+					//	else if (path.StartsWith(Application.dataPath))
+					//	{
+					//		path = path.Substring(Application.dataPath.Length - Application.streamingAssetsPath.Length);
+					//	}
+					//	else
+					//	{
+					//		Debug.LogError($"[{nameof(KxObjectPool)}] StreamingAssets path must start with {Application.streamingAssetsPath} or {Application.persistentDataPath} or {Application.dataPath}/StreamingAssets/.", this);
+					//		return null;
+					//	}
+					//}
+					//break;
+					case eSrcType.Addressable:
+					{
+#if USE_ADDRESSABLE
+						var path = prefabOrString as string;
+						if (string.IsNullOrEmpty(path))
+						{
+							Debug.LogError($"[{nameof(KxObjectPool)}] Addressable path cannot be null or empty.", this);
+							return null;
+						}
+						var handle = Addressables.LoadAssetAsync<GameObject>(path);
+						prefab = handle.WaitForCompletion();
+#else
+						Debug.LogError($"[{nameof(kObjectPool)}] Addressable ({stringOrPrefab}) is not supported in this build, please enable USE_ADDRESSABLE define symbol.");
+#endif
+					}
+					break;
+					default:
+					throw new System.NotImplementedException($"Invalid Source Type: {srcType}");
+				}
+				category.Add(key, info = new PrefabCategory(key, prefab, transform));
 			}
 			return info;
 		}
 
 		Dictionary<GameObject, ISpawnToken[]> m_TokenDict = new Dictionary<GameObject, ISpawnToken[]>(8);
-		protected GameObject InternalSpawn(object prefabOrString, bool isAddressable, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+		protected GameObject InternalSpawn(object prefabOrString, eSrcType srcType, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
 		{
 			if (IsAppQuit)
 				return null;
 #if !USE_ADDRESSABLE
-			if (isAddressable)
+			if (srcType == eSrcType.Addressable)
 			{
 				Debug.LogError($"[{nameof(kObjectPool)}] Addressable is not supported in this build, please enable USE_ADDRESSABLE define symbol.", this);
 				return null;
 			}
 #endif
-			var info = GetOrAddCategory(prefabOrString, isAddressable);
+			var info = GetOrAddCategory(prefabOrString, srcType);
 			if (info == null)
 				return null;
 			info.GetOrAddToken(out var token, parent, worldStay); //parent == null means scene root 
-			m_ActiveTokens.Add(token, info.prefab);
+			m_ActiveTokens.Add(token, info.key);
 			if (!worldStay)
 			{
 				token.transform.SetPositionAndRotation(position, rotation);
@@ -495,22 +601,22 @@ namespace Kit2.ObjectPool
 
 		#region Public API
 		public GameObject Spawn(GameObject prefab, Transform parent, bool worldStay = false)
-			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, false, Vector3.zero, Quaternion.identity, parent, true));
+			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, eSrcType.GameObject, Vector3.zero, Quaternion.identity, parent, true));
 		
 		public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefab, false, position, rotation, parent, worldStay);
+			=> InternalSpawn(prefab, eSrcType.GameObject, position, rotation, parent, worldStay);
 
-		public GameObject Spawn(string prefabPath, bool isAddressable, Transform parent, bool worldStay = false)
-			=> InternalSpawn(prefabPath, isAddressable, Vector3.zero, Quaternion.identity, parent, worldStay);
+		public GameObject Spawn(string prefabPath, eSrcType type, Transform parent, bool worldStay = false)
+			=> InternalSpawn(prefabPath, type, Vector3.zero, Quaternion.identity, parent, worldStay);
 
-		public GameObject Spawn(GameObject prefab, bool isAddressable, Transform parent, bool worldStay = false)
-			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, isAddressable, Vector3.zero, Quaternion.identity, parent, true));
+		public GameObject Spawn(GameObject prefab, eSrcType type, Transform parent, bool worldStay = false)
+			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, type, Vector3.zero, Quaternion.identity, parent, true));
 
-		public GameObject Spawn(string prefabPath, bool isAddressable, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefabPath, isAddressable, position, rotation, parent, worldStay);
+		public GameObject Spawn(string prefabPath, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+			=> InternalSpawn(prefabPath, type, position, rotation, parent, worldStay);
 
-		public GameObject Spawn(GameObject prefab, bool isAddressable, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefab, isAddressable, position, rotation, parent, worldStay);
+		public GameObject Spawn(GameObject prefab, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+			=> InternalSpawn(prefab, type, position, rotation, parent, worldStay);
 
 		public T Spawn<T>(T prefab, Transform parent, bool worldStay = false) where T : Component
 		{
@@ -521,7 +627,7 @@ namespace Kit2.ObjectPool
 			}
 			else
 			{
-				throw new System.Exception($"[{nameof(kObjectPool)}] Spawned object contains no {typeof(T).Name}");
+				throw new System.Exception($"[{nameof(KxObjectPool)}] Spawned object contains no {typeof(T).Name}");
 			}
 		}
 
@@ -534,7 +640,7 @@ namespace Kit2.ObjectPool
 			}
 			else
 			{
-				throw new System.Exception($"[{nameof(kObjectPool)}] Spawned object contains no {typeof(T).Name}");
+				throw new System.Exception($"[{nameof(KxObjectPool)}] Spawned object contains no {typeof(T).Name}");
 			}
 		}
 
@@ -612,7 +718,7 @@ namespace Kit2.ObjectPool
 			}
 		}
 
-		~kObjectPool()
+		~KxObjectPool()
 		{
 			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
 			Dispose(disposing: false);

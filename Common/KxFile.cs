@@ -4,11 +4,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
+using System.Text.RegularExpressions;
 
 namespace Kit2
 {
 	public static class KxPath
 	{
+		private const System.StringComparison IGNORE = System.StringComparison.OrdinalIgnoreCase;
 		private static string FixPath(this string path)
 		{
 			return path
@@ -37,6 +39,58 @@ namespace Kit2
 		public static string GetFileNameWithoutExtension(string path)
 		{
 			return Path.GetFileNameWithoutExtension(path);
+		}
+
+		public static string GetExtension(string path)
+		{
+			return Path.GetExtension(path).Trim();
+		}
+
+		public static bool HasExtension(string path)
+		{
+			return Path.HasExtension(path);
+		}
+
+		private static Regex s_ExtensionRule = new Regex(@"^.*\.([a-zA-Z0-9]{1,5})$");
+		public static bool IsExtension(string path, bool ignoreCase, params string[] extensions)
+		{
+			if (extensions.Length == 0)
+			{
+				Debug.LogWarning("invalid extensions input. cannot be 0");
+				return false;
+			}
+
+			if (!HasExtension(path))
+			{
+				Debug.LogError($"Path didn't contain file extension. {path}");
+				return false;
+			}
+				
+			var ext = GetExtension(path);
+
+			foreach (var extension in extensions)
+			{
+				// common input error.
+				if (!s_ExtensionRule.IsMatch(extension))
+				{
+					Debug.LogWarning($"{extension} is invalid format. are you missing a '.' in front of file extension?");
+					continue;
+				}
+
+				var tag = extension.StartsWith('*') ? extension.Substring(1) : extension;
+
+				if (ignoreCase)
+				{
+					if (tag.Equals(ext, IGNORE))
+						return true;
+				}
+				else
+				{
+					if (tag.Equals(ext))
+						return true;
+				}
+			}
+			return false;
 		}
 	}
 

@@ -15,11 +15,7 @@ namespace Kit2
 		{
 			get
 			{
-#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
-				return Application.dataPath.Replace('/', '\\');
-#else
-                return Application.dataPath.Replace('\\', '/');
-#endif
+				return KxPath.Fix(Application.dataPath);
 			}
 		}
 
@@ -219,7 +215,7 @@ namespace Kit2
 #if DEBUG_MODE
 			var t = new CommandLineTask(shell, args, (b) => { InternalDebugFeedBack(b); completed?.Invoke(b); });
 #else
-            var t = new MyProcess(shell, args, completed);
+            var t = new CommandLineTask(shell, args, completed);
 #endif
 
 			if (Application.isPlaying)

@@ -4,20 +4,34 @@ using System.Collections.Generic;
 using UnityEngine;
 using Newtonsoft.Json;
 using UnityEngine.Networking;
+
 namespace Kit2
 {
 	public static class KxPath
 	{
-		public static string Combine(string dir, string name, string extension)
+		private static string FixPath(this string path)
 		{
-			return Path.Combine(dir, $"{name}.{extension}");
+			return path
+#if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+			.Replace('/', '\\');
+#else
+			// Android, IOS, WebGL
+			.Replace('\\', '/');
+#endif
 		}
 
-		public static string Combine(params string[] args) => string.Join('/', args).Replace('\\', '/');
+		public static string Fix(string path) => path.FixPath();
+
+		public static string Combine(string dir, string name, string extension)
+		{
+			return Path.Combine(dir, $"{name}.{extension}").FixPath(); ;
+		}
+
+		public static string Combine(params string[] args) => string.Join('/', args).FixPath();
 
 		public static string GetDirectoryName(string path)
 		{
-			return Path.GetDirectoryName(path).Replace('\\', '/');
+			return Path.GetDirectoryName(path).FixPath();
 		}
 
 		public static string GetFileNameWithoutExtension(string path)
@@ -98,7 +112,15 @@ namespace Kit2
 			}
 		}
 
+		public static string[] GetFiles(string path)
+		{
+			return Directory.GetFiles(path);
+		}
 
+		public static IEnumerable<string> EnumerateDirectories(string path)
+		{
+			return Directory.EnumerateDirectories(path);
+		}
 	}
 
 	public static class KxFile
@@ -327,5 +349,6 @@ namespace Kit2
 				return false;
 			}
 		}
+
 	}
 }

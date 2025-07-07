@@ -8,7 +8,7 @@ namespace Kit2
 {
 	public static class KxPath
 	{
-		public static string Create(string dir, string name, string extension)
+		public static string Combine(string dir, string name, string extension)
 		{
 			return Path.Combine(dir, $"{name}.{extension}");
 		}
@@ -20,6 +20,10 @@ namespace Kit2
 			return Path.GetDirectoryName(path).Replace('\\', '/');
 		}
 
+		public static string GetFileNameWithoutExtension(string path)
+		{
+			return Path.GetFileNameWithoutExtension(path);
+		}
 	}
 
 	public static class KxDirectory

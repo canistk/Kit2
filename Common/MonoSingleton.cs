@@ -1,8 +1,17 @@
 //#define SHOW_WARNING
+using System.Reflection;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 namespace Kit2
 {
+	public class MonoSingletonConfigAttribute : System.Attribute
+	{
+		public bool DontDestroyOnLoad { get; set; }
+		public string LoadPath { get; set; }
+		public bool UseAddressable { get; set; }
+	}
+
 	/// <summary>SingleTon extend methods with <see cref="MonoBehaviour"/></summary>
 	/// <typeparam name="T"></typeparam>
 	/// <typeparam name="WhenDuplicates"><see cref="DoNothing"/>, <see cref="RemoveLateComer"/>, <see cref="RemoveExisting"/></typeparam>
@@ -23,12 +32,32 @@ namespace Kit2
 			{
 				if (!IsAppQuit && m_Instance == null)
 				{
-					if ((new InstanceBehavior()).Action == (new SearchHierarchy()).Action)
+					var attr = typeof(T).GetCustomAttribute(typeof(MonoSingletonConfigAttribute), false) as MonoSingletonConfigAttribute;
+					if (attr != null && !string.IsNullOrEmpty(attr.LoadPath))
+					{
+						var prefab = attr.UseAddressable ?
+							Addressables.LoadAssetAsync<GameObject>(attr.LoadPath).WaitForCompletion() :
+							Resources.Load<GameObject>(attr.LoadPath);
+
+						// spawn
+						var token = GameObject.Instantiate(prefab, null, true);
+						if (token == null)
+						{
+							throw new System.Exception("Fail to create new MonoSingleton.");
+						}
+						token.gameObject.name = GetTokenName();
+						if (token.GetComponent<T>() == null)
+						{
+							throw new System.NullReferenceException($"Prefab {attr.LoadPath} doesn't contain {typeof(T).Name} component.");
+						}
+						// Awake & regist should being called on spawn
+					}
+					else if ((new InstanceBehavior()).Action == (new SearchHierarchy()).Action)
 					{
 						T searchObject = FindObjectOfType<T>();
 						if (searchObject == null)
 						{
-							new GameObject(typeof(T).Name + " (singleton)", typeof(T));
+							new GameObject(GetTokenName(), typeof(T));
 							// Unity3D : awake MUST run here, otherwise throw null exception
 						}
 						else
@@ -42,11 +71,16 @@ namespace Kit2
 					}
 					else if ((new InstanceBehavior()).Action == (new AutoCreate()).Action)
 					{
-						new GameObject(typeof(T).Name + " (singleton)", typeof(T));
+						new GameObject(GetTokenName(), typeof(T));
 						// Unity3D : awake MUST run here, otherwise throw null exception
 					}
 				}
 				return m_Instance;
+
+				string GetTokenName()
+				{
+					return $"{typeof(T).Name}(singleton)";
+				}
 			}
 		}
 

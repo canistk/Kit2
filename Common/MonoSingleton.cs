@@ -39,7 +39,11 @@ namespace Kit2
 							Addressables.LoadAssetAsync<GameObject>(attr.LoadPath).WaitForCompletion() :
 							Resources.Load<GameObject>(attr.LoadPath);
 
-						// spawn
+						if (prefab == null)
+						{
+							throw new System.Exception($"Fail to load prefab {attr.LoadPath} for {typeof(T).Name}.");
+						}
+							// spawn
 						var token = GameObject.Instantiate(prefab, null, true);
 						if (token == null)
 						{

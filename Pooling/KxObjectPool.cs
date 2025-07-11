@@ -509,6 +509,12 @@ namespace Kit2.ObjectPool
 					default:
 					throw new System.NotImplementedException($"Invalid Source Type: {srcType}");
 				}
+
+				if (prefab == null)
+				{
+					throw new System.NullReferenceException($"Prefab {prefabOrString as string} cannot be null.");
+				}
+
 				category.Add(key, info = new PrefabCategory(key, prefab, transform));
 			}
 			return info;

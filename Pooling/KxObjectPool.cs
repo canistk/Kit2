@@ -11,6 +11,11 @@ using System;
 
 namespace Kit2.ObjectPool
 {
+	public interface ISelfDespawnable
+	{
+		public void SelfDespawn();
+	}
+
 	public interface ISpawnToken
 	{
 		public void OnSpawn(ISpawner pool);

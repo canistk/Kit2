@@ -41,7 +41,7 @@ namespace Kit2
             });
         }
 
-        public static async void BackToMainThread()
+        public static async Task BackToMainThread()
         {
 			await Task.Delay(0).ConfigureAwait(false);
 		}

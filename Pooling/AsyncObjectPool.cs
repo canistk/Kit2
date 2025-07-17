@@ -1,44 +1,17 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 #if USE_ADDRESSABLE
 using UnityEngine.AddressableAssets;
 #endif
 using UnityEngine.ResourceManagement.AsyncOperations;
 using Kit2.Tasks;
-using System;
-
 namespace Kit2.ObjectPool
 {
-	public interface ISelfDespawnable
-	{
-		public void SelfDespawn();
-	}
-
-	public interface ISpawnToken
-	{
-		public void OnSpawn(ISpawner pool);
-		public void OnDespawn();
-	}
-
-	public interface ISpawner
-	{
-		public bool IsSpawned(GameObject token);
-
-		public bool Despawn(GameObject go);
-	}
-
-	public enum eSrcType
-	{
-		GameObject = 0, // for runtime spawn
-		Resources = 1,
-		Addressable = 2,
-		// StreamingAssets, TODO: implement custom loading from StreamingAssets.
-	}
-
-	[System.Obsolete("Use AsyncObjectPool instead.")]
-	public class KxObjectPool : MonoBehaviour, System.IDisposable, ISpawner
+	public class AsyncObjectPool : MonoBehaviour, System.IDisposable, ISpawner
 	{
 		#region Event
 		public delegate void TokenEvent(GameObject token);
@@ -46,7 +19,7 @@ namespace Kit2.ObjectPool
 		public event TokenEvent Event_Despawn;
 		#endregion Event
 
-		public static List<KxObjectPool> Instances { get; } = new List<KxObjectPool>(10);
+		public static List<AsyncObjectPool> Instances { get; } = new List<AsyncObjectPool>(10);
 
 		#region System
 		protected virtual bool ShouldAutoRegisterPool() => false;
@@ -125,9 +98,9 @@ namespace Kit2.ObjectPool
 		public void Preload(GameObject prefab, int preloadAmount, float interval)
 			=> Preload(new PreloadInfo { prefab = prefab, interval = interval, count = preloadAmount });
 
-		public void Preload(PreloadInfo preloadInfo)
+		public async void Preload(PreloadInfo preloadInfo)
 		{
-			var cat = GetOrAddCategory(preloadInfo.prefab, eSrcType.GameObject);
+			var cat = await GetOrAddCategory(preloadInfo.prefab, eSrcType.GameObject);
 			var task = new PreloadTask(cat, preloadInfo, transform);
 #if false
 			tasks.Add(task);
@@ -165,7 +138,7 @@ namespace Kit2.ObjectPool
 
 				if (WaitForDelay())
 					return true;
-				
+
 				var diff = Time.realtimeSinceStartup - m_Last;
 				if (diff < preloadInfo.interval)
 					return true; // wait for interval.
@@ -196,7 +169,7 @@ namespace Kit2.ObjectPool
 		#endregion Preload
 
 		#region Pooling
-		private struct CombineKey: IEquatable<CombineKey>
+		private struct CombineKey : IEquatable<CombineKey>
 		{
 			public readonly eSrcType srcType;
 			public readonly object stringOrObject;
@@ -421,7 +394,7 @@ namespace Kit2.ObjectPool
 			return prefab != null;
 		}
 
-		private PrefabCategory GetOrAddCategory(object prefabOrString, eSrcType srcType)
+		private async Task<PrefabCategory> GetOrAddCategory(object prefabOrString, eSrcType srcType)
 		{
 			if (prefabOrString == null)
 			{
@@ -444,7 +417,9 @@ namespace Kit2.ObjectPool
 			// Quick check if prefab already exists in category
 			if (!category.TryGetValue(key, out PrefabCategory info))
 			{
-				// TODO: locate prefab based on srcType
+				category.Add(key, null); // place holder for the category
+				
+				// Locate prefab based on srcType
 				GameObject prefab = null;
 				switch (srcType)
 				{
@@ -469,33 +444,6 @@ namespace Kit2.ObjectPool
 						prefab = Resources.Load<GameObject>(path);
 					}
 					break;
-					//case eSrcType.StreamingAssets:
-					//{
-					//	var path = prefabOrString as string;
-					//	if (string.IsNullOrEmpty(path))
-					//	{
-					//		Debug.LogError($"[{nameof(KxObjectPool)}] Addressable path cannot be null or empty.", this);
-					//		return null;
-					//	}
-					//	// TODO: try load file from StreamingAssets
-					//	if (path.StartsWith(Application.streamingAssetsPath))
-					//	{
-					//		KxFile.Read()
-					//	}
-					//	else if (path.StartsWith(Application.persistentDataPath))
-					//	{
-					//	}
-					//	else if (path.StartsWith(Application.dataPath))
-					//	{
-					//		path = path.Substring(Application.dataPath.Length - Application.streamingAssetsPath.Length);
-					//	}
-					//	else
-					//	{
-					//		Debug.LogError($"[{nameof(KxObjectPool)}] StreamingAssets path must start with {Application.streamingAssetsPath} or {Application.persistentDataPath} or {Application.dataPath}/StreamingAssets/.", this);
-					//		return null;
-					//	}
-					//}
-					//break;
 					case eSrcType.Addressable:
 					{
 #if USE_ADDRESSABLE
@@ -506,7 +454,11 @@ namespace Kit2.ObjectPool
 							return null;
 						}
 						var handle = Addressables.LoadAssetAsync<GameObject>(path);
-						prefab = handle.WaitForCompletion();
+						while (!handle.IsDone)
+						{
+							await Task.Yield();
+						}
+						prefab = handle.Result;
 #else
 						Debug.LogError($"[{nameof(kObjectPool)}] Addressable ({stringOrPrefab}) is not supported in this build, please enable USE_ADDRESSABLE define symbol.");
 #endif
@@ -521,13 +473,29 @@ namespace Kit2.ObjectPool
 					throw new System.NullReferenceException($"Prefab {prefabOrString as string} cannot be null.");
 				}
 
-				category.Add(key, info = new PrefabCategory(key, prefab, transform));
+				info = new PrefabCategory(key, prefab, transform);
+				category[key] = info; // add to category dictionary
 			}
+			else
+			{
+				// hack to wait for the category creation
+				// assume that the category is being created in another task
+				Debug.Log($"[{nameof(KxObjectPool)}] queue for PrefabCategory[{key}] creation.", this);
+				// wait until the previous task is done
+				while (category[key] == null)
+				{
+					await ThreadExtend.BackToMainThread();
+				}
+				info = category[key];
+				Debug.Assert(info != null, $"[{nameof(KxObjectPool)}] PrefabCategory for {key} should not be null after waiting.");
+				// hack to wait for the category creation
+			}
+
 			return info;
 		}
 
 		Dictionary<GameObject, ISpawnToken[]> m_TokenDict = new Dictionary<GameObject, ISpawnToken[]>(8);
-		protected GameObject InternalSpawn(object prefabOrString, eSrcType srcType, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+		protected async Task<GameObject> InternalSpawn(object prefabOrString, eSrcType srcType, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
 		{
 			if (IsAppQuit)
 				return null;
@@ -538,12 +506,16 @@ namespace Kit2.ObjectPool
 				return null;
 			}
 #endif
-			var info = GetOrAddCategory(prefabOrString, srcType);
+			var info = await GetOrAddCategory(prefabOrString, srcType);
 			if (info == null)
 				return null;
 			info.GetOrAddToken(out var token, parent, worldStay); //parent == null means scene root 
 			m_ActiveTokens.Add(token, info.key);
 			if (!worldStay)
+			{
+				token.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
+			}
+			else
 			{
 				token.transform.SetPositionAndRotation(position, rotation);
 			}
@@ -612,27 +584,27 @@ namespace Kit2.ObjectPool
 		#endregion Pooling
 
 		#region Public API
-		public GameObject Spawn(GameObject prefab, Transform parent, bool worldStay = false)
-			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, eSrcType.GameObject, Vector3.zero, Quaternion.identity, parent, true));
-		
-		public GameObject Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefab, eSrcType.GameObject, position, rotation, parent, worldStay);
+		public async Task<GameObject> Spawn(GameObject prefab, Transform parent, bool worldStay = false)
+			=> await InternalSpawn(prefab, eSrcType.GameObject, Vector3.zero, Quaternion.identity, parent, true);
 
-		public GameObject Spawn(string prefabPath, eSrcType type, Transform parent, bool worldStay = false)
-			=> InternalSpawn(prefabPath, type, Vector3.zero, Quaternion.identity, parent, worldStay);
+		public async Task<GameObject> Spawn(GameObject prefab, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+			=> await InternalSpawn(prefab, eSrcType.GameObject, position, rotation, parent, worldStay);
 
-		public GameObject Spawn(GameObject prefab, eSrcType type, Transform parent, bool worldStay = false)
-			=> ResetLocalPosRot(worldStay, InternalSpawn(prefab, type, Vector3.zero, Quaternion.identity, parent, true));
+		public async Task<GameObject> Spawn(string prefabPath, eSrcType type, Transform parent, bool worldStay = false)
+			=> await InternalSpawn(prefabPath, type, Vector3.zero, Quaternion.identity, parent, worldStay);
 
-		public GameObject Spawn(string prefabPath, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefabPath, type, position, rotation, parent, worldStay);
+		public async Task<GameObject> Spawn(GameObject prefab, eSrcType type, Transform parent, bool worldStay = false)
+			=> await InternalSpawn(prefab, type, Vector3.zero, Quaternion.identity, parent, true);
 
-		public GameObject Spawn(GameObject prefab, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
-			=> InternalSpawn(prefab, type, position, rotation, parent, worldStay);
+		public async Task<GameObject> Spawn(string prefabPath, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+			=> await InternalSpawn(prefabPath, type, position, rotation, parent, worldStay);
 
-		public T Spawn<T>(T prefab, Transform parent, bool worldStay = false) where T : Component
+		public async Task<GameObject> Spawn(GameObject prefab, eSrcType type, Vector3 position, Quaternion rotation, Transform parent, bool worldStay)
+			=> await InternalSpawn(prefab, type, position, rotation, parent, worldStay);
+
+		public async Task<T> Spawn<T>(T prefab, Transform parent, bool worldStay = false) where T : Component
 		{
-			var obj = Spawn(prefab.gameObject, parent, worldStay);
+			var obj = await Spawn(prefab.gameObject, parent, worldStay);
 			if (obj.TryGetComponent<T>(out var component))
 			{
 				return component;
@@ -643,9 +615,9 @@ namespace Kit2.ObjectPool
 			}
 		}
 
-		public T Spawn<T>(T prefab, Vector3 position, Quaternion rotation, Transform parent, bool worldStay) where T : Component
+		public async Task<T> Spawn<T>(T prefab, Vector3 position, Quaternion rotation, Transform parent, bool worldStay) where T : Component
 		{
-			var obj = Spawn(prefab.gameObject, position, rotation, parent, worldStay);
+			var obj = await Spawn(prefab.gameObject, position, rotation, parent, worldStay);
 			if (obj.TryGetComponent<T>(out var component))
 			{
 				return component;
@@ -730,7 +702,7 @@ namespace Kit2.ObjectPool
 			}
 		}
 
-		~KxObjectPool()
+		~AsyncObjectPool()
 		{
 			// Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
 			Dispose(disposing: false);

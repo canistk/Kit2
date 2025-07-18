@@ -209,7 +209,7 @@ namespace Kit2
 		/// <returns></returns>
 		/// <see cref="http://forum.unity3d.com/threads/start-a-external-package.process.17488/"/>
 		/// <seealso cref="http://ss64.com/nt/findstr.html"/>
-		[System.Diagnostics.Conditional("UNITY_EDITOR")]
+		// [System.Diagnostics.Conditional("UNITY_EDITOR")]
 		public static void CommandLine(string shell, string args = "", System.Action<Feedback> completed = null)
 		{
 #if DEBUG_MODE

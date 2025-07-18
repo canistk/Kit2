@@ -2,9 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
 using UnityEditor;
 using Unity.EditorCoroutines.Editor;
-
+#endif
 namespace Kit2.Tasks
 {
 	/// <summary>
@@ -15,20 +16,32 @@ namespace Kit2.Tasks
 		[System.Diagnostics.Conditional("UNITY_EDITOR")]
 		public static void Add(MyTaskBase task)
 		{
+#if UNITY_EDITOR
 			if (s_EditorProgress == null)
 				s_EditorProgress = EditorCoroutineUtility.StartCoroutineOwnerless(EditorLoop());
 			s_EditorTasks.Add(task);
+#endif
 		}
 		[System.Diagnostics.Conditional("UNITY_EDITOR")]
 		public static void ClearUp()
 		{
+#if UNITY_EDITOR
 			Editor_CleanUp();
+#endif
 		}
 
-		private static List<MyTaskBase> s_EditorTasks = new List<MyTaskBase>(8);
+#if UNITY_EDITOR
+
 		public static int TaskCount => s_EditorTasks?.Count ?? 0;
-		private static int m_ExecuteIndex;
 		public static int Executing => TaskCount > 0 ? m_ExecuteIndex : -1;
+#else
+		public static int TaskCount => 0;
+		public static int Executing => -1;
+#endif
+
+#if UNITY_EDITOR
+		private static List<MyTaskBase> s_EditorTasks = new List<MyTaskBase>(8);
+		private static int m_ExecuteIndex;
 		private static EditorCoroutine s_EditorProgress = null;
 		private static IEnumerator EditorLoop()
 		{
@@ -113,5 +126,6 @@ namespace Kit2.Tasks
 				EditorCoroutineUtility.StopCoroutine(s_EditorProgress);
 			s_EditorProgress = null;
 		}
+#endif
 	}
 }

@@ -51,7 +51,24 @@ namespace Kit2
             #endregion IDisposable Support
         }
 
-        public IDisposable AcquireLock(T caller)
+		/// <summary>
+		/// 
+		/// </summary>
+		/// <param name="caller"></param>
+		/// <returns></returns>
+		/// <exception cref="System.InvalidOperationException"></exception>
+		/// <example>
+		/// Method 1
+		/// m_Lock.AcquireLock(this);
+		/// m_Lock.ReleaseLock(this);
+        /// 
+		/// Method 2
+		/// using (m_Lock.AcquireLock(this))
+		/// {
+		///     // You jobs
+		/// }
+		/// </example>
+		public IDisposable AcquireLock(T caller)
         {
             if (!m_LockOwners.Contains(caller))
             {

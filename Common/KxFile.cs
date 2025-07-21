@@ -51,6 +51,42 @@ namespace Kit2
 			return Path.HasExtension(path);
 		}
 
+		public static bool Exists(string path)
+		{
+			if (string.IsNullOrEmpty(path))
+			{
+				Debug.LogError("Path is null or empty.");
+				return false;
+			}
+
+			// TODO: android check if path is a valid path.
+			if (path.Contains("://"))
+			{
+				// assume path are getting from android are contain "://" string.
+				// e.g. Application.streamingAssetsPath
+				var request = UnityWebRequest.Get(path);
+				var operation = request.SendWebRequest();
+				// wait for the request to complete
+				while (!operation.isDone)
+				{
+					// yield return null; // if you are in a coroutine, you can yield here.
+					if (request.result == UnityWebRequest.Result.ConnectionError ||
+						request.result == UnityWebRequest.Result.ProtocolError)
+					{
+						Debug.LogError($"Error checking file existence: {request.error}");
+						return false;
+					}
+				}
+
+				return UnityWebRequest.Get(path).isDone;
+			}
+			else
+			{
+				path = path.FixPath();
+				return File.Exists(path);
+			}
+		}
+
 		private static Regex s_ExtensionRule = new Regex(@"^.*\.([a-zA-Z0-9]{1,5})$");
 		public static bool IsExtension(string path, bool ignoreCase, params string[] extensions)
 		{
@@ -389,7 +425,33 @@ namespace Kit2
 			}
 		}
 		//*/
-
+		public static void Move(string sourcePath, string destPath)
+		{
+			if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(destPath))
+			{
+				Debug.LogError("Source or destination path is null or empty.");
+				return;
+			}
+			if (!File.Exists(sourcePath))
+			{
+				Debug.LogError($"Source file does not exist: {sourcePath}");
+				return;
+			}
+			if (File.Exists(destPath))
+			{
+				// Debug.LogWarning($"Destination file already exists and will be overwritten: {destPath}");
+				try
+				{
+					File.Delete(destPath);
+				}
+				catch (System.Exception e)
+				{
+					Debug.LogError($"Failed to delete existing file at destination: {e.Message}");
+					return;
+				}
+			}
+			File.Move(sourcePath, destPath);
+		}
 		public static bool Delete(string path)
 		{
 
@@ -402,6 +464,45 @@ namespace Kit2
 			{
 				return false;
 			}
+		}
+
+		public static void WriteWithBackup(string path, string content)
+		{
+			if (string.IsNullOrEmpty(path))
+			{
+				Debug.LogError("Path is null or empty.");
+				return;
+			}
+			string dir = Path.GetDirectoryName(path);
+			KxDirectory.EnsureExists(dir);
+
+			if (KxFile.Exists(path))
+			{
+				var backupPath = Path.ChangeExtension(path, ".bak");
+				KxFile.Move(path, backupPath);
+			}
+			File.WriteAllText(path, content);
+		}
+
+		public static void WriteWithBackupByDate(string path, string content)
+		{
+			if (string.IsNullOrEmpty(path))
+			{
+				Debug.LogError("Path is null or empty.");
+				return;
+			}
+
+			string dir = Path.GetDirectoryName(path);
+			KxDirectory.EnsureExists(dir);
+
+			if (KxFile.Exists(path))
+			{
+				var fName = KxPath.GetFileNameWithoutExtension(path);
+				var date = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+				var backupPath = KxPath.Combine(dir, $"{fName}_{date}.bak");
+				KxFile.Move(path, backupPath);
+			}
+			File.WriteAllText(path, content);
 		}
 
 	}

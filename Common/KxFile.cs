@@ -207,6 +207,11 @@ namespace Kit2
 			return Directory.GetFiles(path);
 		}
 
+		public static string[] GetFiles(string path, string searchPattern, SearchOption searchOption = SearchOption.TopDirectoryOnly)
+		{
+			return Directory.GetFiles(path, searchPattern, searchOption);
+		}
+
 		public static IEnumerable<string> EnumerateDirectories(string path)
 		{
 			return Directory.EnumerateDirectories(path);
@@ -233,6 +238,11 @@ namespace Kit2
 			return Path.Combine(UnityEngine.Application.streamingAssetsPath, relativePath);
 		}
 
+		public static string ChangeExtension(string path, string extension)
+		{
+			return Path.ChangeExtension(path, extension);
+		}
+
 		public static void WriteSA(string relativePath, string filename, string ext, string content, bool backup = true)
 		{
 			string dir = GetDir(relativePath);
@@ -243,7 +253,7 @@ namespace Kit2
 
 		public static void Write(string path, string content, bool backup = true)
 		{
-			const string ext = "_bak.bak";
+			const string EXT = ".bak";
 			string dir = Path.GetDirectoryName(path);
 			KxDirectory.EnsureExists(dir);
 
@@ -252,11 +262,8 @@ namespace Kit2
 				if (backup)
 				{
 					// Move to backup file, when path exist.
-					string bak = Path.ChangeExtension(path, ext);
-					if (File.Exists(bak))
-						File.Delete(bak);
-					// move current target folder in to backup.
-					File.Move(path, bak);
+					var backupPath = ChangeExtension(path, EXT);
+					Move(path, backupPath);
 				}
 				else
 				{
@@ -464,24 +471,6 @@ namespace Kit2
 			{
 				return false;
 			}
-		}
-
-		public static void WriteWithBackup(string path, string content)
-		{
-			if (string.IsNullOrEmpty(path))
-			{
-				Debug.LogError("Path is null or empty.");
-				return;
-			}
-			string dir = Path.GetDirectoryName(path);
-			KxDirectory.EnsureExists(dir);
-
-			if (KxFile.Exists(path))
-			{
-				var backupPath = Path.ChangeExtension(path, ".bak");
-				KxFile.Move(path, backupPath);
-			}
-			File.WriteAllText(path, content);
 		}
 
 		public static void WriteWithBackupByDate(string path, string content)

@@ -323,25 +323,29 @@ namespace Kit2.ObjectPool
 				if (disposing)
 				{
 					// dispose managed state (managed objects)
-					if (activeObjs.Count > 0)
-					{
-						var gos = activeObjs.ToArray();
-						foreach (var go in gos)
-						{
-							if (go)
-								ReturnToken(go);
-						}
-						gos = null;
-					}
-					activeObjs.Clear();
-					while (deactiveObjs.Count > 0)
-					{
-						var token = deactiveObjs.Dequeue();
-						if (token)
-							GameObject.Destroy(token);
-					}
-					deactiveObjs.Clear();
+					/// Should reparent all tokens to this parent.
+					/// but always fail when the object pool being destroy.
+					/// <see cref="ReturnToken(GameObject)"/>
+					//foreach (var go in gos)
+					//{
+					//	if (go) ReturnToken(go);
+					//}
 
+					/// instead of reparenting and then destroy all tokens. directly destroy all tokens.
+					var tokens = activeObjs.ToList().Concat(deactiveObjs).ToArray();
+					activeObjs.Clear();
+					deactiveObjs.Clear();
+					for (int i = 0; i < tokens.Length; ++i)
+					{
+						if (tokens[i] == null)
+							continue;
+						try
+						{
+							GameObject.Destroy(tokens[i]);
+						}
+						catch { }
+					}
+					tokens = null; // clear reference
 					if (srcType == eSrcType.Addressable)
 					{
 #if USE_ADDRESSABLE

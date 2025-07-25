@@ -13,11 +13,13 @@ namespace Kit2
 		private const System.StringComparison IGNORE = System.StringComparison.OrdinalIgnoreCase;
 		private static string FixPath(this string path)
 		{
+			// since Addressable only support '/', style.
 			return path
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
+			// Win32 style. '\\' in explorer
 			.Replace('/', '\\');
 #else
-			// Android, IOS, WebGL
+			// Addressable, Android, IOS, WebGL
 			.Replace('\\', '/');
 #endif
 		}

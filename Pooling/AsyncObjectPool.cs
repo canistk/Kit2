@@ -484,7 +484,7 @@ namespace Kit2.ObjectPool
 			{
 				// hack to wait for the category creation
 				// assume that the category is being created in another task
-				Debug.Log($"[{nameof(KxObjectPool)}] queue for PrefabCategory[{key}] creation.", this);
+				// Debug.Log($"[{nameof(KxObjectPool)}] queue for PrefabCategory[{key}] creation.", this);
 				// wait until the previous task is done
 				while (category[key] == null)
 				{

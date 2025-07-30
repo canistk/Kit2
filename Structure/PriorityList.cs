@@ -2,6 +2,7 @@ using System.Linq;
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using Codice.CM.Common;
 
 namespace Kit2
 {
@@ -117,9 +118,19 @@ namespace Kit2
 			SortItems();
 		}
 
-		public int Remove(PriorityObject item)
+		public bool Remove(PriorityObject item)
 		{
-			return lists.RemoveAll(o => o.Equals(item));
+			var i = lists.Count;
+			while (i --> 0)
+			{
+				if (!lists[i].Equals(item))
+					continue;
+				lists.RemoveAt(i);
+				SortItems();
+				return true;
+			}
+			return false;
+			// return lists.RemoveAll(o => o.Equals(item));
 		}
 
 

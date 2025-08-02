@@ -53,6 +53,11 @@ namespace Kit2
 			return Path.HasExtension(path);
 		}
 
+		public static string ChangeExtension(string path, string extension)
+		{
+			return Path.ChangeExtension(path, extension);
+		}
+
 		public static bool Exists(string path)
 		{
 			if (string.IsNullOrEmpty(path))
@@ -240,11 +245,6 @@ namespace Kit2
 			return Path.Combine(UnityEngine.Application.streamingAssetsPath, relativePath);
 		}
 
-		public static string ChangeExtension(string path, string extension)
-		{
-			return Path.ChangeExtension(path, extension);
-		}
-
 		public static void WriteSA(string relativePath, string filename, string ext, string content, bool backup = true)
 		{
 			string dir = GetDir(relativePath);
@@ -264,7 +264,7 @@ namespace Kit2
 				if (backup)
 				{
 					// Move to backup file, when path exist.
-					var backupPath = ChangeExtension(path, EXT);
+					var backupPath = KxPath.ChangeExtension(path, EXT);
 					Move(path, backupPath);
 				}
 				else

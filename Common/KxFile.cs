@@ -135,6 +135,45 @@ namespace Kit2
 			}
 			return false;
 		}
+
+
+		/// <summary></summary>
+		/// <param name="path">Input absolute or relative convert into absolute and relative in project</param>
+		/// <param name="absolutePath"></param>
+		/// <param name="relativePath"></param>
+		/// <exception cref="System.NullReferenceException"></exception>
+		/// <exception cref="System.NotImplementedException"></exception>
+		public static void ResolvePath(string path, out string absolutePath, out string relativePath)
+		{
+			if (path == null || path.Length == 0)
+				throw new System.NullReferenceException();
+
+#if true
+			path = path.Replace("\\", "/");
+			var isRelativePath = path.StartsWith("Assets/");
+			var isAbsPath = path.StartsWith(Application.dataPath);
+			if (isRelativePath)
+			{
+				var str = path.Substring(7);
+				absolutePath = Path.Combine(Application.dataPath, str).Replace("\\", "/");
+				relativePath = Path.Combine("Assets", str).Replace("\\", "/");
+				return;
+			}
+			if (isAbsPath)
+			{
+				var str = path.Substring(Application.dataPath.Length + 1);
+				absolutePath = Path.Combine(Application.dataPath, str).Replace("\\", "/");
+				relativePath = Path.Combine("Assets", str).Replace("\\", "/");
+				return;
+			}
+			throw new System.NotImplementedException($"Unknow path format : {path}");
+#else
+			// Only work on file.
+			relativePath = FileUtil.GetProjectRelativePath(path);
+			// absolutePath = FileUtil.GetLogicalPath(path);
+			absolutePath = FileUtil.GetPhysicalPath(path);
+#endif
+		}
 	}
 
 	public static class KxDirectory

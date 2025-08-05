@@ -14,13 +14,13 @@ namespace Kit2
 		private static string FixPath(this string path)
 		{
 			// since Addressable only support '/', style.
-			return path
+			return path.Replace('\\', '/');
 #if UNITY_EDITOR_WIN || UNITY_STANDALONE_WIN
 			// Win32 style. '\\' in explorer
-			.Replace('/', '\\');
+			//.Replace('/', '\\');
 #else
 			// Addressable, Android, IOS, WebGL
-			.Replace('\\', '/');
+			//.Replace('\\', '/');
 #endif
 		}
 
@@ -55,7 +55,7 @@ namespace Kit2
 
 		public static string ChangeExtension(string path, string extension)
 		{
-			return Path.ChangeExtension(path, extension);
+			return Path.ChangeExtension(path, extension).FixPath();
 		}
 
 		public static bool Exists(string path)

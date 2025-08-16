@@ -2,6 +2,7 @@
 using UnityEngine;
 using Action = System.Action;
 using System.Collections.Generic;
+
 #if UNITY_EDITOR
 using PrefabUtility = UnityEditor.PrefabUtility;
 using PrefabType = UnityEditor.PrefabType;
@@ -182,5 +183,25 @@ namespace Kit2
 			callback?.Invoke();
 		}
 		#endregion // Coroutine
+
+		#region Editor Mode
+		public static bool IsInPrefabIsolationMode()
+		{
+#if UNITY_EDITOR
+			if (UnityEditor.SceneManagement.PrefabStageUtility.GetCurrentPrefabStage() != null)
+				return true;
+#endif
+			return false;
+		}
+
+		public static bool IsEditorMode(this Component component)
+		{
+#if UNITY_EDITOR
+			return !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode;
+#else
+			return false;
+#endif
+		}
+		#endregion Editor Mode
 	}
 }

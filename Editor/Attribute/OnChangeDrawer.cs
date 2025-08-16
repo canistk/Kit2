@@ -5,6 +5,7 @@ using UnityEditor;
 
 namespace Kit2
 {
+	[System.Obsolete("Use OnValueChange instead", true)]
 	[CustomPropertyDrawer(typeof(OnChangeAttribute))]
 	public sealed class OnChangeDrawer : PropertyDrawer
 	{
@@ -12,11 +13,12 @@ namespace Kit2
 
 		public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
 		{
-			EditorGUI.BeginProperty(position, label, property);
 			using (new EditorGUI.PropertyScope(position, label, property))
 			using (var checker = new EditorGUI.ChangeCheckScope())
 			{
 				EditorGUI.PropertyField(position, property, label, true);
+				if (!checker.changed)
+					return;
 				try
 				{
 					Type type = property.serializedObject.targetObject.GetType();
@@ -36,10 +38,7 @@ namespace Kit2
 				}
 				finally
 				{
-					if (checker.changed)
-					{
-						property.serializedObject.ApplyModifiedProperties();
-					}
+					property.serializedObject.ApplyModifiedProperties();
 				}
 			}
 		}

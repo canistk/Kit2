@@ -512,7 +512,7 @@ namespace Kit2.ObjectPool
 						var handle = Addressables.LoadAssetAsync<GameObject>(path);
 						prefab = handle.WaitForCompletion();
 #else
-						Debug.LogError($"[{nameof(kObjectPool)}] Addressable ({stringOrPrefab}) is not supported in this build, please enable USE_ADDRESSABLE define symbol.");
+						Debug.LogError($"[{nameof(KxObjectPool)}] Addressable ({prefabOrString}) is not supported in this build, please enable USE_ADDRESSABLE define symbol.");
 #endif
 					}
 					break;
@@ -538,7 +538,7 @@ namespace Kit2.ObjectPool
 #if !USE_ADDRESSABLE
 			if (srcType == eSrcType.Addressable)
 			{
-				Debug.LogError($"[{nameof(kObjectPool)}] Addressable is not supported in this build, please enable USE_ADDRESSABLE define symbol.", this);
+				Debug.LogError($"[{nameof(KxObjectPool)}] Addressable is not supported in this build, please enable USE_ADDRESSABLE define symbol.", this);
 				return null;
 			}
 #endif

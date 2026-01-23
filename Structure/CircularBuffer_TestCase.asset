@@ -9,6 +9,6 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 412564ffaf803d74b8319c4fed5e1c44, type: 3}
+  m_Script: {fileID: 11500000, guid: 60b10c6d05d6e884488b78c9b1eb0fe7, type: 3}
   m_Name: CircularBuffer_TestCase
   m_EditorClassIdentifier: 

@@ -157,6 +157,49 @@ namespace Kit2
 		public static bool Contains(this Bounds bounds, Vector3 worldPos, Vector3 boundsPos, Quaternion boundsRotate)
 		=> bounds.Contains(worldPos, Matrix4x4.TRS(boundsPos, boundsRotate, Vector3.one));
 
+		/// <summary>
+		/// Combine the world-space <see cref="Renderer.bounds"/> of every renderer into one encapsulating bounds.
+		/// Null entries are skipped. Returns false (bounds left as default) if no renderer contributed.
+		/// </summary>
+		public static bool TryGetBounds(this Renderer[] renderers, out Bounds bounds)
+		{
+			bounds = default;
+			if (renderers == null || renderers.Length == 0)
+				return false;
+
+			bool initialized = false;
+			for (int i = 0; i < renderers.Length; ++i)
+			{
+				var r = renderers[i];
+				if (r == null)
+					continue;
+
+				if (!initialized)
+				{
+					bounds = r.bounds;
+					initialized = true;
+				}
+				else
+				{
+					bounds.Encapsulate(r.bounds);
+				}
+			}
+			return initialized;
+		}
+
+		/// <summary>
+		/// Combine the world-space bounds of every <see cref="Renderer"/> (Skinned or otherwise)
+		/// found under <paramref name="root"/>, itself included.
+		/// </summary>
+		public static bool TryGetBounds(this Transform root, out Bounds bounds, bool includeInactive = false)
+		{
+			bounds = default;
+			if (root == null)
+				return false;
+			var renderers = root.GetComponentsInChildren<Renderer>(includeInactive);
+			return renderers.TryGetBounds(out bounds);
+		}
+
 		public static Vector3[] GetVertices(this Bounds bounds)
         {
             var c = bounds.center;

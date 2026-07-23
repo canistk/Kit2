@@ -98,7 +98,7 @@ namespace Kit2
             {
                 return token.value;
             }
-            else if (token.IsIdentifier())
+            else if (token.IsIdentifier() || token.IsOperator())
             {
                 var sb = new System.Text.StringBuilder();
                 sb.Append(token.value);

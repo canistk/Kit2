@@ -26,11 +26,6 @@ namespace Kit2
 
 		public static string Fix(string path) => path.FixPath();
 
-		public static string Combine(string dir, string name, string extension)
-		{
-			return Path.Combine(dir, $"{name}.{extension}").FixPath(); ;
-		}
-
 		public static string Combine(params string[] args) => string.Join('/', args).FixPath();
 
 		public static string GetDirectoryName(string path)
